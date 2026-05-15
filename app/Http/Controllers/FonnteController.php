@@ -89,14 +89,12 @@ class FonnteController extends Controller
         try {
             $token = config('services.fonnte.token');
 
-            // $response = Http::withHeaders([
-            //     'Authorization' => $token,
-            // ])->asForm()->post('https://api.fonnte.com/send', [
-            //             'target' => $data['sender'] ?? '',
-            //             'message' => $reply['message'] ?? '',
-            //             'url' => $reply['url'] ?? '',
-            //             'filename' => $reply['filename'] ?? '',
-            //         ]);
+            $response = Http::withHeaders([
+                'Authorization' => $token,
+            ])->asForm()->post('https://api.fonnte.com/send', [
+                        'target' => $data['sender'] ?? '',
+                        'message' => $reply['message'] ?? '',
+                    ]);
 
             $client = new Client();
             $client->post(config('services.n8n.webhook_url'), [
@@ -109,8 +107,7 @@ class FonnteController extends Controller
                 'verify' => false,
             ]);
 
-            // return $response->body();
-            return response()->json(['ok' => true]);
+            return $response->body();
         } catch (\Exception $e) {
             \Log::error('Webhook Error: ' . $e->getMessage());
             throw $e;

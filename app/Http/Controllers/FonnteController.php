@@ -40,31 +40,32 @@ class FonnteController extends Controller
         $conversation = Conversation::where('sender', $request->sender)->first();
 
         $reply = [];
+        $reference = '';
         if (!$conversation || $conversation == null) {
-            $ref = \Str::uuid();
+            $reference = \Str::uuid();
 
-            Conversation::create([
-                ...$request->all(),
-                'reference' => $ref,
+            $request->merge([
+                'reference' => $reference,
                 'role' => 'user',
             ]);
 
-            $request->merge([
-                'reference' => $ref,
+            Conversation::create([
+                ...$request->all(),
             ]);
 
             $reply = [
                 'message' => "Halo, ada yang bisa kami bantu?",
             ];
         } else {
-            Conversation::create([
-                ...$request->all(),
-                'reference' => $conversation->reference,
+            $reference = $conversation->reference;
+
+            $request->merge([
+                'reference' => $reference,
                 'role' => 'user',
             ]);
 
-            $request->merge([
-                'reference' => $conversation->reference,
+            Conversation::create([
+                ...$request->all(),
             ]);
 
             $reply = [
@@ -72,10 +73,18 @@ class FonnteController extends Controller
             ];
         }
 
-        $this->sendFonnte($request->all(), $reply);
+        $conversations = Conversation::query()
+            ->where('reference', $reference)
+            ->orderBy('created_at')
+            ->limit(20)
+            ->get()
+            ->map(fn(Conversation $item) => "{$item->role}:{$item->message}")
+            ->implode("\n");
+
+        $this->sendFonnte($request->all(), $reply, $conversations);
     }
 
-    private function sendFonnte(array $data, array $reply): string
+    private function sendFonnte(array $data, array $reply, string $conversations): string
     {
         try {
             $token = config('services.fonnte.token');
@@ -94,6 +103,7 @@ class FonnteController extends Controller
                 'json' => [
                     'sender' => $data['sender'] ?? '',
                     'reference' => $data['reference'] ?? '',
+                    'conversations' => $conversations,
                 ],
                 'timeout' => 10,
                 'verify' => false,

@@ -53,9 +53,7 @@ class FonnteController extends Controller
                 ...$request->all(),
             ]);
 
-            $reply = [
-                'message' => "Halo, ada yang bisa kami bantu?",
-            ];
+
         } else {
             $reference = $conversation->reference;
 
@@ -68,9 +66,6 @@ class FonnteController extends Controller
                 ...$request->all(),
             ]);
 
-            $reply = [
-                'message' => "Mohon ditunggu",
-            ];
         }
 
         $conversations = Conversation::query()
@@ -81,10 +76,10 @@ class FonnteController extends Controller
             ->map(fn(Conversation $item) => "{$item->role}:{$item->message}")
             ->implode("\n");
 
-        $this->sendFonnte($request->all(), $reply, $conversations);
+        $this->sendFonnte($request->all(), $conversations);
     }
 
-    private function sendFonnte(array $data, array $reply, string $conversations): string
+    private function sendFonnte(array $data, string $conversations): string
     {
         try {
             $token = config('services.fonnte.token');
@@ -93,12 +88,13 @@ class FonnteController extends Controller
                 'Authorization' => $token,
             ])->asForm()->post('https://api.fonnte.com/send', [
                         'target' => $data['sender'] ?? '',
-                        'message' => $reply['message'] ?? '',
+                        'message' => '',
                     ]);
 
             $client = new Client();
             $client->post(config('services.n8n.webhook_url'), [
                 'json' => [
+                    'name' => $data['name'] ?? '',
                     'sender' => $data['sender'] ?? '',
                     'reference' => $data['reference'] ?? '',
                     'conversations' => $conversations,

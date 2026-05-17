@@ -107,14 +107,7 @@ class FonnteController extends Controller
 
     private function isSessionReset(string $message): bool
     {
-        $patterns = [
-            '/^(halo|hai|hi|hey|hello|selamat\s+(pagi|siang|sore|malam))$/i',
-            '/^(makasih|thanks|terima\s+kasih|thx|ok\s+(makasih|thanks|terima\s+kasih)|sama[\s-]*sama)/i',
-            '/^(sampai\s+jumpa|dadah|bye|dah|met\s+malam|good\s+(night|bye))$/i',
-            '/^(ok|sip|baik|sudah\s+jelas|udah\s+jelas|paham|oke|okeh)$/i',
-        ];
-
-        return (bool) preg_match(implode('|', $patterns), trim($message));
+        return (bool) preg_match('/^(halo|hai|hi|hey|hello|selamat\s+(pagi|siang|sore|malam))$|^(makasih|thanks|terima\s+kasih|thx|ok\s+(makasih|thanks|terima\s+kasih)|sama[\s-]*sama)$|^(sampai\s+jumpa|dadah|bye|dah|met\s+malam|good\s+(night|bye))$|^(ok|sip|baik|sudah\s+jelas|udah\s+jelas|paham|oke|okeh)$/i', trim($message));
     }
 
     private function sendToN8n(string $reference, array $data): string

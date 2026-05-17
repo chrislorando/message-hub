@@ -141,7 +141,6 @@ class FonnteController extends Controller
                 'sender' => $data['sender'] ?? '',
                 'reference' => $reference,
                 'conversations' => $conversations,
-                'current_summary' => $summaryRow?->summary ?? '',
             ],
             'timeout' => 10,
             'verify' => false,

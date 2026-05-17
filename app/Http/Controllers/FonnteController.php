@@ -22,9 +22,15 @@ class FonnteController extends Controller
             'message' => $message,
         ]);
 
-        $conversation = Conversation::where('sender', $request->sender)->first();
+        $isNewSession = $this->isSessionReset($message);
 
-        $reference = $conversation?->reference ?? (string) Str::uuid();
+        if ($isNewSession) {
+            $reference = (string) Str::uuid();
+        } else {
+            $reference = Conversation::where('sender', $request->sender)
+                ->latest('id')
+                ->value('reference') ?? (string) Str::uuid();
+        }
 
         $request->merge([
             'reference' => $reference,
@@ -97,6 +103,18 @@ class FonnteController extends Controller
             ->update(['summary' => $summary]);
 
         return response()->json(['ok' => true]);
+    }
+
+    private function isSessionReset(string $message): bool
+    {
+        $patterns = [
+            '/^(halo|hai|hi|hey|hello|selamat\s+(pagi|siang|sore|malam))$/i',
+            '/^(makasih|thanks|terima\s+kasih|thx|ok\s+(makasih|thanks|terima\s+kasih)|sama[\s-]*sama)/i',
+            '/^(sampai\s+jumpa|dadah|bye|dah|met\s+malam|good\s+(night|bye))$/i',
+            '/^(ok|sip|baik|sudah\s+jelas|udah\s+jelas|paham|oke|okeh)$/i',
+        ];
+
+        return (bool) preg_match(implode('|', $patterns), trim($message));
     }
 
     private function sendToN8n(string $reference, array $data): string

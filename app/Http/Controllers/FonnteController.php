@@ -111,7 +111,7 @@ class FonnteController extends Controller
 
         $messages = Conversation::query()
             ->where('reference', $reference)
-            ->latest()
+            ->orderBy('id', 'asc')
             ->limit($recentLimit)
             ->get();
 

@@ -3,23 +3,36 @@
 namespace App\Http\Controllers;
 
 use App\Models\Conversation;
+use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use GuzzleHttp\Client;
 
 class FonnteController extends Controller
 {
-    /**
-     * Fonnte incoming webhook (JSON body).
-     */
     public function webhook(Request $request)
     {
         if ($request->isMethod('GET')) {
             return response()->json(['ok' => true]);
         }
 
-        $request->only([
+        $message = Str::lower(trim((string) ($request->message ?? '')));
+
+        $request->merge([
+            'message' => $message,
+        ]);
+
+        $conversation = Conversation::where('sender', $request->sender)->first();
+
+        $reference = $conversation?->reference ?? (string) Str::uuid();
+
+        $request->merge([
+            'reference' => $reference,
+            'role' => 'user',
+        ]);
+
+        Conversation::create($request->only([
+            'reference',
             'device',
             'sender',
             'message',
@@ -29,85 +42,10 @@ class FonnteController extends Controller
             'url',
             'filename',
             'extension',
-        ]);
+            'role',
+        ]));
 
-        $message = Str::lower(trim((string) ($request->message ?? '')));
-
-        $request->merge([
-            'message' => $message
-        ]);
-
-        $conversation = Conversation::where('sender', $request->sender)->first();
-
-        $reply = [];
-        $reference = '';
-        if (!$conversation || $conversation == null) {
-            $reference = \Str::uuid();
-
-            $request->merge([
-                'reference' => $reference,
-                'role' => 'user',
-            ]);
-
-            Conversation::create([
-                ...$request->all(),
-            ]);
-
-
-        } else {
-            $reference = $conversation->reference;
-
-            $request->merge([
-                'reference' => $reference,
-                'role' => 'user',
-            ]);
-
-            Conversation::create([
-                ...$request->all(),
-            ]);
-
-        }
-
-        $conversations = Conversation::query()
-            ->where('reference', $reference)
-            ->orderBy('created_at')
-            ->limit(20)
-            ->get()
-            ->map(fn(Conversation $item) => "{$item->role}:{$item->message}")
-            ->implode("\n");
-
-        $this->sendFonnte($request->all(), $conversations);
-    }
-
-    private function sendFonnte(array $data, string $conversations): string
-    {
-        try {
-            $token = config('services.fonnte.token');
-
-            $response = Http::withHeaders([
-                'Authorization' => $token,
-            ])->asForm()->post('https://api.fonnte.com/send', [
-                        'target' => $data['sender'] ?? '',
-                        'message' => '',
-                    ]);
-
-            $client = new Client();
-            $client->post(config('services.n8n.webhook_url'), [
-                'json' => [
-                    'name' => $data['name'] ?? '',
-                    'sender' => $data['sender'] ?? '',
-                    'reference' => $data['reference'] ?? '',
-                    'conversations' => $conversations,
-                ],
-                'timeout' => 10,
-                'verify' => false,
-            ]);
-
-            return $response->body();
-        } catch (\Exception $e) {
-            \Log::error('Webhook Error: ' . $e->getMessage());
-            throw $e;
-        }
+        $this->sendToN8n($reference, $request->only(['name', 'sender']));
     }
 
     public function answer(Request $request)
@@ -115,23 +53,100 @@ class FonnteController extends Controller
         $token = config('services.fonnte.token');
 
         try {
-            Conversation::create([
-                ...$request->all(),
-                'role' => 'assistant',
-            ]);
+            Conversation::create($request->only([
+                'reference',
+                'device',
+                'sender',
+                'message',
+                'member',
+                'name',
+                'location',
+                'url',
+                'filename',
+                'extension',
+            ]) + ['role' => 'assistant']);
 
-            $response = Http::withHeaders([
+            Http::withHeaders([
                 'Authorization' => $token,
             ])->asForm()->post('https://api.fonnte.com/send', [
-                        'target' => $request->sender ?? '',
-                        'message' => $request->message ?? '',
-                    ]);
+                'target' => $request->sender ?? '',
+                'message' => $request->message ?? '',
+            ]);
 
-            return $response->body();
+            return '';
         } catch (\Exception $e) {
-            \Log::error('Webhook Error: ' . $e->getMessage());
+            \Log::error('Webhook Error: '.$e->getMessage());
+
             throw $e;
         }
     }
-}
 
+    public function summary(Request $request)
+    {
+        $reference = $request->input('reference');
+        $summary = $request->input('summary');
+
+        if (! $reference || ! $summary) {
+            return response()->json(['error' => 'Missing reference or summary'], 422);
+        }
+
+        Conversation::query()
+            ->where('reference', $reference)
+            ->latest('id')
+            ->limit(1)
+            ->update(['summary' => $summary]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function sendToN8n(string $reference, array $data): string
+    {
+        $recentLimit = config('services.n8n.recent_message_limit', 10);
+
+        $summaryRow = Conversation::query()
+            ->where('reference', $reference)
+            ->whereNotNull('summary')
+            ->latest('id')
+            ->first();
+
+        $messages = Conversation::query()
+            ->where('reference', $reference)
+            ->latest()
+            ->limit($recentLimit)
+            ->get();
+
+        $conversations = '';
+
+        if ($summaryRow?->summary) {
+            $conversations .= "[Ringkasan percakapan sebelumnya]\n{$summaryRow->summary}\n\n";
+        }
+
+        $conversations .= '[Percakapan terakhir]'."\n".$messages
+            ->map(fn (Conversation $c) => "{$c->role}:{$c->message}")
+            ->implode("\n");
+
+        $token = config('services.fonnte.token');
+
+        Http::withHeaders([
+            'Authorization' => $token,
+        ])->asForm()->post('https://api.fonnte.com/send', [
+            'target' => $data['sender'] ?? '',
+            'message' => '',
+        ]);
+
+        $client = new Client;
+        $client->post(config('services.n8n.webhook_url'), [
+            'json' => [
+                'name' => $data['name'] ?? '',
+                'sender' => $data['sender'] ?? '',
+                'reference' => $reference,
+                'conversations' => $conversations,
+                'current_summary' => $summaryRow?->summary ?? '',
+            ],
+            'timeout' => 10,
+            'verify' => false,
+        ]);
+
+        return '';
+    }
+}

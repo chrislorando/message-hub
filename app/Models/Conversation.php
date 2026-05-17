@@ -6,9 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class Conversation extends Model
 {
-    /**
-     * @var list<string>
-     */
     protected $fillable = [
         'reference',
         'device',
@@ -21,5 +18,6 @@ class Conversation extends Model
         'filename',
         'extension',
         'role',
+        'summary',
     ];
 }

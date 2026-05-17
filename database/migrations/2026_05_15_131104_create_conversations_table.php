@@ -16,6 +16,7 @@ return new class extends Migration {
             $table->string('device')->nullable();
             $table->string('sender')->nullable();
             $table->text('message')->nullable();
+            $table->text('summary')->nullable();
             $table->string('member')->nullable();
             $table->string('name')->nullable();
             $table->text('location')->nullable();

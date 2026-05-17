@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'fonnte/webhook',
             'fonnte/answer',
+            'fonnte/summary',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

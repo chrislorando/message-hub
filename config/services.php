@@ -41,6 +41,8 @@ return [
 
     'n8n' => [
         'webhook_url' => env('N8N_WEBHOOK_URL'),
+        'summary_interval' => (int) env('N8N_SUMMARY_INTERVAL', 10),
+        'recent_message_limit' => (int) env('N8N_RECENT_MESSAGE_LIMIT', 10),
     ],
 
 ];

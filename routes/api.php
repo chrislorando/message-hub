@@ -10,3 +10,4 @@ Route::get('/user', function (Request $request) {
 
 Route::match(['get', 'post'], 'fonnte/webhook', [FonnteController::class, 'webhook'])->name('fonnte.webhook');
 Route::match(['post'], 'fonnte/answer', [FonnteController::class, 'answer'])->name('fonnte.answer');
+Route::match(['post'], 'fonnte/summary', [FonnteController::class, 'summary'])->name('fonnte.summary');

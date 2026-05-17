@@ -75,13 +75,14 @@ class FonnteController extends Controller
             Http::withHeaders([
                 'Authorization' => $token,
             ])->asForm()->post('https://api.fonnte.com/send', [
-                'target' => $request->sender ?? '',
-                'message' => $request->message ?? '',
-            ]);
+                        'target' => $request->sender ?? '',
+                        'message' => $request->message ?? '',
+                        "delay" => rand(1, 3)
+                    ]);
 
             return '';
         } catch (\Exception $e) {
-            \Log::error('Webhook Error: '.$e->getMessage());
+            \Log::error('Webhook Error: ' . $e->getMessage());
 
             throw $e;
         }
@@ -92,7 +93,7 @@ class FonnteController extends Controller
         $reference = $request->input('reference');
         $summary = $request->input('summary');
 
-        if (! $reference || ! $summary) {
+        if (!$reference || !$summary) {
             return response()->json(['error' => 'Missing reference or summary'], 422);
         }
 
@@ -132,8 +133,8 @@ class FonnteController extends Controller
             $conversations .= "[Ringkasan percakapan sebelumnya]\n{$summaryRow->summary}\n\n";
         }
 
-        $conversations .= '[Percakapan terakhir]'."\n".$messages
-            ->map(fn (Conversation $c) => "{$c->role}:{$c->message}")
+        $conversations .= '[Percakapan terakhir]' . "\n" . $messages
+            ->map(fn(Conversation $c) => "{$c->role}:{$c->message}")
             ->implode("\n");
 
         $token = config('services.fonnte.token');
@@ -141,9 +142,10 @@ class FonnteController extends Controller
         Http::withHeaders([
             'Authorization' => $token,
         ])->asForm()->post('https://api.fonnte.com/send', [
-            'target' => $data['sender'] ?? '',
-            'message' => '',
-        ]);
+                    'target' => $data['sender'] ?? '',
+                    'message' => '',
+                    "delay" => rand(1, 3)
+                ]);
 
         $client = new Client;
         $client->post(config('services.n8n.webhook_url'), [
